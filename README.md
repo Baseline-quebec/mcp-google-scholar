@@ -1,229 +1,65 @@
-# Google Scholar MCP Server
-[![smithery badge](https://smithery.ai/badge/@JackKuo666/google-scholar-mcp-server)](https://smithery.ai/server/@JackKuo666/google-scholar-mcp-server)
+# mcp-google-scholar
 
-🔍 Enable AI assistants to search and access Google Scholar papers through a simple MCP interface.
+Serveur MCP pour la recherche d'articles et de profils sur Google Scholar, par scraping direct (`requests` + `beautifulsoup4`).
 
-The Google Scholar MCP Server provides a bridge between AI assistants and Google Scholar through the Model Context Protocol (MCP). It allows AI models to search for academic papers and access their content in a programmatic way.
+> Fork durci de [JackKuo666/Google-Scholar-MCP-Server](https://github.com/JackKuo666/Google-Scholar-MCP-Server). La dependance `scholarly` (non maintenue depuis 2023) et sa chaine transitive a risque (`free-proxy`, `fake-useragent`, `selenium`) ont ete retirees ; voir [SECURITY](#securite).
 
-## ✨ Core Features
-- 🔎 Paper Search: Query Google Scholar papers with custom search strings or advanced search parameters ✅
-- 🚀 Efficient Retrieval: Fast access to paper metadata ✅
-- 👤 Author Information: Retrieve detailed information about authors ✅
-- 📊 Research Support: Facilitate academic research and analysis ✅
-
-## 🚀 Quick Start
-
-### Installing Manually
-### Installing via Smithery
-
-To install google-scholar Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@JackKuo666/google-scholar-mcp-server):
-
-#### claude
-
-```sh
-npx -y @smithery/cli@latest install @JackKuo666/google-scholar-mcp-server --client claude --config "{}"
-```
-
-#### Cursor
-
-Paste the following into Settings → Cursor Settings → MCP → Add new server: 
-- Mac/Linux  
-```s
-npx -y @smithery/cli@latest run @JackKuo666/google-scholar-mcp-server --client cursor --config "{}" 
-```
-#### Windsurf
-```sh
-npx -y @smithery/cli@latest install @JackKuo666/google-scholar-mcp-server --client windsurf --config "{}"
-```
-### CLine
-```sh
-npx -y @smithery/cli@latest install @JackKuo666/google-scholar-mcp-server --client cline --config "{}"
-```
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/JackKuo666/google-scholar-MCP-Server.git
-   cd google-scholar-MCP-Server
-   ```
-
-2. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-
-For development:
+## Setup
 
 ```bash
-# Clone and set up development environment
-git clone https://github.com/JackKuo666/Google-Scholar-MCP-Server.git
-cd Google-Scholar-MCP-Server
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-
-# Install dependencies
-pip install -r requirements.txt
+uv venv --python 3.14 .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 ```
 
-## 📊 Usage
+Aucun secret requis : le serveur n'accede qu'a des pages publiques de `scholar.google.com`.
 
-Start the MCP server:
+## Usage
 
 ```bash
-python google_scholar_server.py
+uv run python google_scholar_server.py
 ```
 
-Once the server is running, you can use the provided MCP tools in your AI assistant or application. Here are some examples of how to use the tools:
+Transport stdio (FastMCP). Une fois lance, les trois outils sont disponibles cote assistant.
 
-### Example 1: Search for papers using keywords
+## MCP Tools (3)
 
-```python
-result = await mcp.use_tool("search_google_scholar_key_words", {
-    "query": "artificial intelligence ethics",
-    "num_results": 5
-})
-print(result)
-```
+| Outil | Type | Description |
+|-------|------|-------------|
+| `search_google_scholar_key_words` | Lecture | Recherche par mots-cles (`query`, `num_results=5`) |
+| `search_google_scholar_advanced` | Lecture | Recherche avancee (`query`, `author`, `year_range`, `num_results=5`) |
+| `get_author_info` | Lecture | Profil auteur : nom, affiliation, interets, citations, publications |
 
-### Example 2: Perform an advanced search
+Chaque outil retourne des dictionnaires ; en cas d'echec, une cle `error` decrit la cause (incluant le cas CAPTCHA / rate-limit de Google Scholar).
 
-```python
-result = await mcp.use_tool("search_google_scholar_advanced", {
-    "query": "machine learning",
-    "author": "Hinton",
-    "year_range": [2020, 2023],
-    "num_results": 3
-})
-print(result)
-```
-
-### Example 3: Get author information
-
-```python
-result = await mcp.use_tool("get_author_info", {
-    "author_name": "Geoffrey Hinton"
-})
-print(result)
-```
-
-These examples demonstrate how to use the three main tools provided by the Google Scholar MCP Server. Adjust the parameters as needed for your specific use case.
-
-## Usage with Claude Desktop
-
-Add this configuration to your `claude_desktop_config.json`:
-
-(Mac OS)
-
-```json
-{
-  "mcpServers": {
-    "google-scholar": {
-      "command": "python",
-      "args": ["-m", "google_scholar_mcp_server"]
-      }
-  }
-}
-```
-
-(Windows version):
-
-```json
-{
-  "mcpServers": {
-    "google-scholar": {
-      "command": "C:\\Users\\YOUR\\PATH\\miniconda3\\envs\\mcp_server\\python.exe",
-      "args": [
-        "D:\\code\\YOUR\\PATH\\Google-Scholar-MCP-Server\\google_scholar_server.py"
-      ],
-      "env": {},
-      "disabled": false,
-      "autoApprove": []
-    }
-  }
-}
-```
-Using with Cline
-```json
-{
-  "mcpServers": {
-    "google-scholar": {
-      "command": "bash",
-      "args": [
-        "-c",
-        "source /home/YOUR/PATH/.venv/bin/activate && python /home/YOUR/PATH/google_scholar_mcp_server.py"
-      ],
-      "env": {},
-      "disabled": false,
-      "autoApprove": []
-    }
-  }
-}
-```
-
-
-## 🛠 MCP Tools
-
-The Google Scholar MCP Server provides the following tools:
-
-### search_google_scholar_key_words
-
-Search for articles on Google Scholar using key words.
-
-**Parameters:**
-- `query` (str): Search query string
-- `num_results` (int, optional): Number of results to return (default: 5)
-
-**Returns:** List of dictionaries containing article information
-
-### search_google_scholar_advanced
-
-Perform an advanced search for articles on Google Scholar.
-
-**Parameters:**
-- `query` (str): General search query
-- `author` (str, optional): Author name
-- `year_range` (tuple, optional): Tuple containing (start_year, end_year)
-- `num_results` (int, optional): Number of results to return (default: 5)
-
-**Returns:** List of dictionaries containing article information
-
-### get_author_info
-
-Get detailed information about an author from Google Scholar.
-
-**Parameters:**
-- `author_name` (str): Name of the author to search for
-
-**Returns:** Dictionary containing author information
-
-## 📁 Project Structure
-
-- `google_scholar_server.py`: The main MCP server implementation using FastMCP
-- `google_scholar_web_search.py`: Contains the web scraping logic for searching Google Scholar
-
-## 🔧 Dependencies
-
-- Python 3.10+
-- mcp[cli]>=1.4.1
-- scholarly>=1.7.0
-- asyncio>=3.4.3
-
-You can install the required dependencies using:
+## Development
 
 ```bash
-pip install -r requirements.txt
+uv run ruff check .     # Lint
+uv run ruff format .    # Format
+uv run pytest -q        # Tests
 ```
 
-## 🤝 Contributing
+## Architecture
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+```
+google_scholar_server.py      (FastMCP, transport stdio — couche outils MCP)
+        |
+google_scholar_web_search.py  (scraping requests + bs4 vers scholar.google.com)
+```
 
-## 📄 License
+## Securite
 
-This project is licensed under the MIT License.
+Ce fork existe pour reduire la surface d'attaque supply chain :
 
-## ⚠️ Disclaimer
+- **`scholarly` retire** : non maintenu depuis janvier 2023, il tirait `free-proxy` (telecharge des listes de proxy tierces a l'execution et y route le trafic), `fake-useragent` et `selenium`.
+- **`get_author_info` reimplemente** en scraping direct, coherent avec les recherches deja existantes.
+- **Backport `asyncio` retire** du `pyproject.toml` (le paquet PyPI `asyncio` masque le module stdlib sur Python moderne).
+- **Versions epinglees** avec bornes majeures (`requests`, `beautifulsoup4`, `mcp`).
+- **Detection CAPTCHA / rate-limit** pour des erreurs honnetes.
 
-This tool is for research purposes only. Please respect Google Scholar's terms of service and use this tool responsibly.
+Compromis assume : sans proxies, Google Scholar peut servir un CAPTCHA sur les requetes intensives (surtout les profils auteurs). Les outils degradent proprement via une cle `error`.
+
+## Licence
+
+MIT (voir l'amont). Usage de recherche uniquement ; respecter les conditions d'utilisation de Google Scholar.
