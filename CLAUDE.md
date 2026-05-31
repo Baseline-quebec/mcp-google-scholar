@@ -47,7 +47,10 @@ scholar.google.com (pages publiques HTML)
 
 - `_parse_results` : parse une page de resultats en liste d'articles.
 - `_find_author_id` : resout un nom d'auteur vers un id de profil Scholar.
-- `_is_blocked` : detecte l'interstitiel CAPTCHA / rate-limit.
+- `_is_blocked` : detecte l'interstitiel CAPTCHA / rate-limit (marqueurs precis, pas le simple mot "captcha").
+- `_parse_int` : parse un entier avec separateur de milliers (citations), 0 si echec.
+
+Les recherches mots-cles / avancee et la page profil verifient toutes `_is_blocked` (echec explicite via cle `error`, jamais de resultat vide silencieux).
 
 ## Outils MCP (3 total)
 
