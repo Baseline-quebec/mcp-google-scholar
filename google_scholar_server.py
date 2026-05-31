@@ -1,9 +1,12 @@
-from typing import Any, List, Dict, Optional, Union
+from typing import Any, List, Dict, Optional
 import asyncio
 import logging
 from mcp.server.fastmcp import FastMCP
-from google_scholar_web_search import google_scholar_search, advanced_google_scholar_search
-from scholarly import scholarly
+from google_scholar_web_search import (
+    advanced_google_scholar_search,
+    get_author_info as _get_author_info,
+    google_scholar_search,
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -67,26 +70,7 @@ async def get_author_info(author_name: str) -> Dict[str, Any]:
         Dictionary containing author information
     """
     try:
-        search_query = scholarly.search_author(author_name)
-        author = await asyncio.to_thread(next, search_query)
-        filled_author = await asyncio.to_thread(scholarly.fill, author)
-        
-        # Extract relevant information
-        author_info = {
-            "name": filled_author.get("name", "N/A"),
-            "affiliation": filled_author.get("affiliation", "N/A"),
-            "interests": filled_author.get("interests", []),
-            "citedby": filled_author.get("citedby", 0),
-            "publications": [
-                {
-                    "title": pub.get("bib", {}).get("title", "N/A"),
-                    "year": pub.get("bib", {}).get("pub_year", "N/A"),
-                    "citations": pub.get("num_citations", 0)
-                }
-                for pub in filled_author.get("publications", [])[:5]  # Limit to top 5 publications
-            ]
-        }
-        return author_info
+        return await asyncio.to_thread(_get_author_info, author_name)
     except Exception as e:
         return {"error": f"An error occurred while retrieving author information: {str(e)}"}
 
