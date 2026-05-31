@@ -19,11 +19,22 @@ _HEADERS = {
 }
 _TIMEOUT = 20
 
+# Markers specific to Google's anti-bot interstitial. Kept narrow on purpose:
+# a bare "captcha" substring would false-positive on legitimate results about
+# CAPTCHA research, so we rely on phrases that only the block page contains.
+_BLOCK_MARKERS = ("/sorry/", "unusual traffic", "not a robot")
+
 
 def _is_blocked(html: str) -> bool:
     """Detect Google Scholar's CAPTCHA / rate-limit interstitial."""
     lowered = html.lower()
-    return "captcha" in lowered or "/sorry/" in lowered or "unusual traffic" in lowered
+    return any(marker in lowered for marker in _BLOCK_MARKERS)
+
+
+def _parse_int(text: str) -> int:
+    """Parse an integer that may carry thousands separators; 0 on failure."""
+    digits = text.replace(",", "").replace("\xa0", "").strip()
+    return int(digits) if digits.isdigit() else 0
 
 
 def _parse_results(html: str, num_results: int) -> List[Dict[str, Any]]:
@@ -36,16 +47,16 @@ def _parse_results(html: str, num_results: int) -> List[Dict[str, Any]]:
             break
 
         title_tag = item.find("h3", class_="gs_rt")
-        title = title_tag.get_text() if title_tag else "No title available"
+        title = title_tag.get_text(strip=True) if title_tag else "No title available"
 
         link_tag = title_tag.find("a") if title_tag else None
-        link = link_tag["href"] if link_tag else "No link available"
+        link = link_tag.get("href", "No link available") if link_tag else "No link available"
 
         authors_tag = item.find("div", class_="gs_a")
-        authors = authors_tag.get_text() if authors_tag else "No authors available"
+        authors = authors_tag.get_text(strip=True) if authors_tag else "No authors available"
 
         abstract_tag = item.find("div", class_="gs_rs")
-        abstract = abstract_tag.get_text() if abstract_tag else "No abstract available"
+        abstract = abstract_tag.get_text(strip=True) if abstract_tag else "No abstract available"
 
         results.append(
             {
@@ -65,6 +76,8 @@ def google_scholar_search(query: str, num_results: int = 5) -> List[Dict[str, An
     response = requests.get(search_url, headers=_HEADERS, timeout=_TIMEOUT)
     if response.status_code != 200:
         return [{"error": f"Failed to fetch data. HTTP Status code: {response.status_code}"}]
+    if _is_blocked(response.text):
+        return [{"error": "Google Scholar served a CAPTCHA / rate limit; try again later."}]
     return _parse_results(response.text, num_results)
 
 
@@ -77,7 +90,7 @@ def advanced_google_scholar_search(
     """Search Google Scholar using advanced filters (author, year range)."""
     params: Dict[str, Any] = {"q": query}
     if author:
-        params["as_auth"] = author
+        params["as_sauthors"] = author
     if year_range:
         start_year, end_year = year_range
         params["as_ylo"] = start_year
@@ -87,6 +100,8 @@ def advanced_google_scholar_search(
     response = requests.get(search_url, headers=_HEADERS, timeout=_TIMEOUT)
     if response.status_code != 200:
         return [{"error": f"Failed to fetch data. HTTP Status code: {response.status_code}"}]
+    if _is_blocked(response.text):
+        return [{"error": "Google Scholar served a CAPTCHA / rate limit; try again later."}]
     return _parse_results(response.text, num_results)
 
 
@@ -130,36 +145,32 @@ def get_author_info(author_name: str, max_publications: int = 5) -> Dict[str, An
     response = requests.get(profile_url, headers=_HEADERS, timeout=_TIMEOUT)
     if response.status_code != 200:
         return {"error": f"Failed to fetch profile. HTTP Status code: {response.status_code}"}
+    if _is_blocked(response.text):
+        return {"error": "Google Scholar served a CAPTCHA / rate limit; try again later."}
 
     soup = BeautifulSoup(response.text, "html.parser")
 
     name_tag = soup.find(id="gsc_prf_in")
-    name = name_tag.get_text() if name_tag else "N/A"
+    name = name_tag.get_text(strip=True) if name_tag else "N/A"
 
     affiliation_tag = soup.find("div", class_="gsc_prf_il")
-    affiliation = affiliation_tag.get_text() if affiliation_tag else "N/A"
+    affiliation = affiliation_tag.get_text(strip=True) if affiliation_tag else "N/A"
 
-    interests = [a.get_text() for a in soup.select("#gsc_prf_int a")]
+    interests = [a.get_text(strip=True) for a in soup.select("#gsc_prf_int a")]
 
-    citedby = 0
     cited_cells = soup.select("td.gsc_rsb_std")
-    if cited_cells:
-        try:
-            citedby = int(cited_cells[0].get_text())
-        except ValueError:
-            citedby = 0
+    citedby = _parse_int(cited_cells[0].get_text()) if cited_cells else 0
 
     publications: List[Dict[str, Any]] = []
     for row in soup.select("tr.gsc_a_tr")[:max_publications]:
         title_tag = row.select_one("a.gsc_a_at")
         year_tag = row.select_one("span.gsc_a_h")
         citations_tag = row.select_one("a.gsc_a_ac")
-        citations_text = citations_tag.get_text() if citations_tag else ""
         publications.append(
             {
-                "title": title_tag.get_text() if title_tag else "N/A",
-                "year": year_tag.get_text() if year_tag else "N/A",
-                "citations": int(citations_text) if citations_text.isdigit() else 0,
+                "title": title_tag.get_text(strip=True) if title_tag else "N/A",
+                "year": year_tag.get_text(strip=True) if year_tag else "N/A",
+                "citations": _parse_int(citations_tag.get_text()) if citations_tag else 0,
             }
         )
 
